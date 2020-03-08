@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>有关Tor的真实身份与虚拟身份 | Jane Blog System</title>
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../resources/styles.css">
+</head>
+<body>
+    <div class="header">
+        <a class="logo" href="../index.html"
+           style="background: url(../resources/logo.svg); background-size: 100% 100%"></a>
+        <div class="nav">
+            <a href="../index.html">Home</a>
+            <a href="../nav1-links.html">Links</a>
+            <a href="../nav2-my-nav.html">My Nav Page</a>
+        </div>
+    </div>
+    <div class="page-image" style="background: url(https://picsum.photos/2560/600) center; background-size: cover"></div>
+    <div class="main article-page">
+        <h1>有关Tor的真实身份与虚拟身份</h1>
+        <div class="page-cate-date">
+            <a href="../index.html#it">IT</a>
+            · 2020-03-08
+        </div>
+        <p>记录一些使用Tor的安全心得
+<strong>一个自然人可以拥有多个身份(虚拟的身份，真实的身份)，一个身份含有一个或多个账户。</strong></p>
+<h2>方案一 (共用Tor回路)：因为虚拟身份少，所以账户数量少，因此不考虑使用虚拟机来管理账户</h2>
+<p>这种方案肯定是不安全，因为一旦主机系统被入侵，真实身份的信息会遭受到牵连，可以用全军覆没来形容。尽管如此，下面还是来分析一下这种方案下的两种情况：</p>
+<h3>1.使用虚拟账户要注意的问题</h3>
+<p>如果你要使用你某个虚拟身份的某个虚拟账户，把这个账户理解为A账户。你使用这个A账户经过Tor去做一些敏感操作，比如上各种论坛、社交网站，或者是邮箱等等；那就请不要在非Tor的环境下继续使用这个A账户。因为几乎每个网站都会记录登录和注销的时间，你的位置，IP，和其他一些的身份信息，哪怕你只是不小心在非Tor的环境下使用一次，你的账户都会被记录，而留下一些的蛛丝马迹而引起怀疑，最终这些蛛丝马迹与Tor环境下的A账户的身份信息形成关联，发现是同一个人的行为，暴露了这个账户，前功尽弃。</p>
+<h3>2.真实身份与虚拟身份</h3>
+<p>这种情况，假设真实身份为X，虚拟身份为Y，一般在非Tor的环境下使用X身份的账户作为日常操作，要进行敏感操作则开启Tor使用Y身份的账户来操作。同样是要考虑如何不让这两个身份(X和Y)产生关联，除了一切的身份信息不能有相同之外，短时间内不要频繁地交替使用这两个身份，拿访问服务器来打个比方，如果短时间内用X和Y访问同一台服务器，即使访问者的IP不一样，但是这两个身份短时间内出现的时间点会太过于巧合，所以即使他们的身份信息不一样也难免让人产生怀疑，如果出现的次数足够多，会让人猜测这两个身份的操作是否属于同一个人的行为，形成关联，暴露了你的真实身份，非常危险。</p>
+<h2>方案二 (不共用Tor回路)：虚拟身份多，账户数量自然很多，因此要考虑使用虚拟机给每个身份配专属的Tor回路</h2>
+<p>Tor的回路，大概10分钟更换一次(包括出口节点)，但是，不同身份的不同账户，在10分钟以内操作频繁的话，即使用了Tor还是很容易让人判断出身份间的关联性，原因是短时间内它们的出口节点依旧是相同的。解决的办法就是让不同的身份呆在不同的虚拟机里，分别在虚拟机里安装部署专属于这个身份的Tor环境，不用担心共用tor回路而产生出口节点相同的问题，虽然现在即使是采用了虚拟机的专属Tor通道的方案，但是还要时刻提醒自己要遵循着方案一的第1点来进行操作。</p>
+<h2>总结</h2>
+<p>前面讲了这么多为的就是不要让这些账户信息产生关联。同一身份下的账户之间产生关联，没有危险，毕竟是同一个身份下的。但是，不同身份的账户之间产生关联，就很危险，最坏的情况是，这些被关联到的身份都报废了。特别，尤其是，如果跟真实身份上的账户产生了关联就十分危险。</p>
+
+    </div>
+    <div class="footer">
+        © <a href="mailto://pandolia@yeah.net">Pandolia</a>
+        - <a target="_blank" href="https://jane.pandolia.net/">Jane</a>
+        - <a target="_blank" href="https://alembic.darn.es/">Alembic</a>
+        - 2020
+    </div>
+</body>
+</html>

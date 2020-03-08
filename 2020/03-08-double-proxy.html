@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>双重代理搭配虚拟机HostOnly模式实现匿名上网 | Jane Blog System</title>
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../resources/styles.css">
+</head>
+<body>
+    <div class="header">
+        <a class="logo" href="../index.html"
+           style="background: url(../resources/logo.svg); background-size: 100% 100%"></a>
+        <div class="nav">
+            <a href="../index.html">Home</a>
+            <a href="../nav1-links.html">Links</a>
+            <a href="../nav2-my-nav.html">My Nav Page</a>
+        </div>
+    </div>
+    <div class="page-image" style="background: url(https://picsum.photos/2560/600) center; background-size: cover"></div>
+    <div class="main article-page">
+        <h1>双重代理搭配虚拟机HostOnly模式实现匿名上网</h1>
+        <div class="page-cate-date">
+            <a href="../index.html#it">IT</a>
+            · 2020-03-08
+        </div>
+        <p>为人为己，安心上网</p>
+<!-- more -->
+<h1>目的</h1>
+<p>首先，我的目标是主机用ssr搭配Tor建立双重代理，虚拟机以host-only模式连到主机实现匿名上网，确保隐私和安全。
+(其实有很多方案比我选的方案要更安全，比如嵌套虚拟机方案，又或者单主机搭配多个独立虚拟机方案等等，但是奈何我电脑的内存不够大，安全的代价就是性能的下降，anyway，我只能用单虚拟机的方案玩玩)，以下所有的命令操作以及文件位置都是基于debian系列讲述，仅作参考(其实都大同小异)</p>
+<hr />
+<p>需要说明的是，本文记录的是单纯Tor结合firefox的一个方案，而不是Tor跟firefox结合出来的Tor Browser Bundle。
+可以用Tor搭配自己喜欢的browser，直接使用Tor Browser Bundle也一样可以。
+还有一点，如果用浏览器版本的Tor，则不能以root权限启用。</p>
+<hr />
+<h1>DNS</h1>
+<p>首先进行http请求之前要先经过DNS域名解析的步骤，HTTPS仅仅对传输的内容加密，但是一般在进行DNS解析的过程中，依然容易受到域名劫持和域名污染(DNS cache poisoning)。而DoH(DNS over HTTPS)是一个进行安全化域名解析的方案，或者理解为是协议。基于已加密的HTTPS协议进行DNS解析请求，目的是避免MITM(Man-in-the-middle attack),也就是DNS投毒劫持污染等等手段，在妥善部署和配置好服务端与客户端的前提下，ISP或者一些中间设备无法篡改已加密的HTTPS通信，或者是获知其请求的内容，故能有效保护使用者的安全隐私。另一方面，基于已经成熟并且广泛部署的HTTPS协议，客户端进行利用则较为方便。google search dnscrypt project的官网，选取适用于你的系统的DoH客户端进行配置，linux的dns位置一般在/etc/resolv.conf，以优先度上到下来看，除了第一行填上<code>nameserver 127.0.0.1</code>之外，下面几行可以接着填上google的DNS地址或是其它的一些DNS地址以及原来网关使用的DNS，以备不时之需。 (如果是选用dnscrypt-proxy这款软件，其项目的github地址有非常详尽安装操作说明)。
+<em>(推荐了解Lin Clark的A cartoon intro to DNS over HTTPS，和DNS over HTTPS的Wikipedia page。)</em></p>
+<h1>虚拟机</h1>
+<p>接下来当然就是安装虚拟机了，推荐开源的virtual box，因为其代码开源，可以被大众所获取，如果软件带有偷窥隐私的行为，则容易被发现。安装完之后：</p>
+<hr />
+<p>虚拟机setting里有个Shared Folders功能，(也就是把主机上的某个文件映射到虚拟机来使用)，需要安装VBoxGuestAdditions.iso来使用。可以在菜单栏Devices最下面的Insert Guest Additions CD image选项可以下载安装，不过可以先到/usr/share/virtualbox里看看有没有已经附带，一般已经附带了，推荐安装，很多实用功能。</p>
+<hr />
+<ol>
+<li>到菜单新建一个Host-Only的内网，名称一般默认为vboxnet0，ip一般默认是192.168.56.1(这个也是主机在虚拟内网的ip)，因为打算给虚拟机设置静态ip，所以vboxnet0没有开启DHCP Server。</li>
+<li>然后右键虚拟机进入settings，Network里确认只开启一个Adapter，勾选Enable，Attached to Host-only Adapter，Name选vobxnet0(虚拟网的名字)。</li>
+<li>启动虚拟机后，给虚拟机设置静态ip，编辑/etc/network/interfaces，在下面添加：</li>
+</ol>
+<pre><code class="language-bash">auto eth0                 #如果是用wifi，eth0好像要改成wlan0
+iface eth0 inet static    #同上
+address 192.168.56.33     #没记错的话最后一位可以从2到254其中选一位
+netmask 255.255.255.0
+</code></pre>
+<ol start="4">
+<li>重启一下网络，systemctl restart networking或者/etc/init.d/networking restart</li>
+<li>虚拟机敲命令ip a或者安装net-tools用ifconfig查看一下，可以看到eth0网卡的ip已经设置为192.168.56.33了。(如果是用笔记本连wifi，网卡的名字可能是wlan0)</li>
+<li>回到主机敲ifconfig，看到在虚拟网的ip是192.168.56.1(没记错可以理解为内网的网关)，这时候虚拟机跟主机互Ping一下(192.168.56.33和192.168.56.1)，如果能互相Ping通，则内网设置没问题了。</li>
+<li>这时候虚拟机还不能上网，虚拟机的部分先放一放，接下来需要在主机开启shadowsocksR以及Tor，确保这两个服务正常运作。<font color="#FF0000">注意，一般GUI版的shadowsocks，都会有类似‘局域网共享’这么一个选项，记得把它勾选上，不然像第8点里命令的第二行，Tor服务很有可能会使用不上SSR对外监听的1080端口；如果是命令行版本的SSR也要在说明文档里注意一下有没有类似的局域网共享开关机制。</font></li>
+<li>编辑Tor目录下的torrc文件，找到SocksPort附近那几行，可以看到单独开服务的话默认监听9050端口，而直接开Tor Browser Bundle则默认监听9150端口，现在打算单独开Tor走上SSR代理，所以像下面设置：</li>
+</ol>
+<pre><code class="language-bash">SocksPort 0.0.0.0:9050         #0.0.0.0的意思是允许端口接受任意连接(包括外部电脑)
+Socks5Proxy 127.0.0.1:1080     #设置Tor走SSR的socks5协议，假设SSR本地监听1080端口
+</code></pre>
+<p>🔺8.5 这一步可以选择性做，也是编辑Torrc这个配置文件，在里面屏蔽一些你认为信不过的国家和地区(具体请自行找资料设置)。了解Tor原理都知道Tor的中转节点遍布全世界，一些国家会把Tor节点设为‘蜜罐’，一旦中转到这些蜜罐一样有可能监视到你的流量，所以也可以顺便借此机会了解一下9眼国、14眼国。</p>
+<hr />
+<p><strong>题外话</strong>，理论上，如果你的代理是用http协议，则可以让Tor也走上这个代理，配置文件里添加的是：</p>
+<pre><code class="language-bash">HTTPSProxy 127.0.0.1:1234       #假设代理的监听端口是1234
+</code></pre>
+<p>我试过，但是不知道为什么连不上我的SSR，就决定不再钻牛角尖了，欢迎留言探讨。</p>
+<hr />
+<ol start="9">
+<li>这一步，要确保两样东西运作正常，前置代理(VPN or SSR之类)，后置代理(Tor)。用systemctl status查看一下是否都运作正常。查看一下端口是否都开启正确</li>
+</ol>
+<pre><code class="language-bash">netstat -lnt
+</code></pre>
+<ol start="10">
+<li>然后，你可以先在本机上打开firefox试试，network proxy -&gt; settings -&gt; manual proxy configuration，SOCKS Host填本机127.0.0.1，Port填写Tor正在监听的9050端口，然后进入google主页，然后搜ip，如无意外，你会看到出来的ip地址不是前置代理的ip，而是Tor回路出口节点的ip。(也许你已经注意到用Tor上google是一种很愚蠢的行为，因为ip流量异常而会出现无休止的图片验证，再加上权威的搜索引擎会记录你上网的一些敏感信息，所以强烈推荐使用duckduckgo)</li>
+<li>现在回到虚拟机，做上面第10步一样的事情。除了有一个步骤不同，就是，因为是Host-only模式的关系，所以在浏览器的setting的SOCKS Host填的不是127.0.0.1，而是192.168.56.1(主机在虚拟网的地址)。可以用以下网址来测ip是否成功连上了Tor来匿名上网：
+<code>https://check.Torproject.org/</code>
+<code>ip-check.info/</code></li>
+</ol>
+<p>🔺 到了11步，基本上虚拟机HostOnly模式经过主机的Tor服务实现匿名上网的目的已经实现了，但是有些软件不支持socks协议，只支持http协议。这时候需要在主机安装上Privoxy，表面上看是一款http代理工具，经过配置，它可以进行‘代理转发’，跟一般的‘端口转发’有点类似，(更多详情请自行了解)，端口转发工作在TCP传输层，代理转发工作在应用层。kali上的配置文件在/etc/privoxy/config，我的编辑如下：</p>
+<pre><code class="language-bash">forward-socks5 / 127.0.0.1:9050 .       #注意最后是有一点的，把Privoxy收到的HTTP请求转发给本机Tor内置的SOCKS代理
+listen-address   0.0.0.0:8118             #Privoxy默认对外监听8118，可以自行修改
+</code></pre>
+<p>主机启动Privoxy后，可以在虚拟机里只支持http协议软件的设置上，代理栏的http(s)填上192.168.56.1，端口8118，测试软件是否成功运作。
+🔺 鉴于host-only模式，虚拟机Ping不通外网的域名或者ip地址是正常的。另外提一下，Ping用的是ICMP协议，运作在IP层，而代理使用应用层协议，运作在应用层。
+🔺 如果过程中设置没问题，但是虚拟机的浏览器就是无法上网，很有可能是防火墙没设置好，可以直接尝试把主机跟虚拟机的防火墙都关闭掉再试试，成功上网之后，在主机的防火墙的inbound添加TCP端口，比如Tor在监听的9050端口。
+🔺 /etc/environment，这个文件可以设置全局代理，不过安全起见，一般还是不建议这样直接设，以防止某些有潜在威胁的软件偷偷在后台联网。
+🔺 主机和虚拟机的防火墙都要以‘最小权限原则’打开。(凡是不需要的都禁止)
+🔺 由于尽量不把你的真实身份泄漏到Tor回路，以下是一些温馨提示：</p>
+<ol>
+<li>建议不要在用Tor的时候进行手机验证等一切敏感信息验证</li>
+<li>尽量不要将Tor用在一些知名的搜索引擎</li>
+<li>用Tor的时候尽量不要使用<strong>一切</strong>自己<strong>真实的身份</strong>的信息</li>
+<li>不要在不安全的系统上使用Tor(比如Windows)，环境不安全再加上如果你使用的软件有漏洞就会有机会让你的上网流量绕过了Tor代理</li>
+<li>不要在短时间内，匿名和非匿名访问同一台服务器。比如说，正在使用Tor匿名访问一台服务器，然后同一时间非Tor非匿名地访问同一台服务器，一旦发生停电等网络的故障，就很容易让匿名与非匿名的身份产生关联。</li>
+<li>更多一些注意事项，可以参考我的另一篇博文&lt;&lt;有关Tor的真实身份与虚拟身份&gt;&gt;。</li>
+</ol>
+<p>🔺 最后，Host-Only模式说白了就是防止虚拟机里不安全的软件不走代理，直连网络，而强迫他们都要经过主机的前置+Tor的双重代理联网。多虚拟机方案虽然不是本文的内容，但是像文章开头所说，如果想更安全，使用嵌套虚拟机方案的话，则是开两个虚拟机，虚拟机A里放安全的前置代理结合Tor，同时确保使用的系统是对Tor友好的，安全的，(可以搜一下一些不错的hack OS或者名声好的linux)，然后设置双网卡，NAT网卡与主机通信，Host-Only网卡与虚拟机B通信。然后在虚拟机B仅仅使用Host-Only网卡与虚拟机A通信，同时保持安全意识地使用软件连到虚拟机A的Tor代理匿名上网。</p>
+
+    </div>
+    <div class="footer">
+        © <a href="mailto://pandolia@yeah.net">Pandolia</a>
+        - <a target="_blank" href="https://jane.pandolia.net/">Jane</a>
+        - <a target="_blank" href="https://alembic.darn.es/">Alembic</a>
+        - 2020
+    </div>
+</body>
+</html>
